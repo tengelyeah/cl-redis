@@ -847,10 +847,81 @@ Note: before/after can only have 2 values: :before or :after.")
 (def-cmd SCRIPT-KILL () :status
   "Kill the script currently in execution.")
 
+;; flowing command added by lhl
 (def-cmd SCRIPT-FLUSH () :status
   "Remove all the scripts from the script cache.")
 
+(def-cmd XADD (key num &rest key-values) :bulk
+  "add a data to stream")
 
+(def-cmd XREAD (keys &rest args &key count block) :multi
+  "read datas from streams")
+
+(defmethod tell ((cmd (eql 'XREAD)) &rest args)
+  (ds-bind (keys &key count block) args
+    (let ((cmdstr (cl:append (when count (list "COUNT" count))
+                             (when block (list "BLOCK" block))
+	                     (list "STREAMS")
+	                     (apply #'cl:append (apply #'mapcar #'list keys)))))
+	  (format t "~a~&" cmdstr)
+	  (apply #'tell "XREAD" cmdstr))))
+
+(def-cmd XREADGROUP (group consumer keys &rest args &key count block noack) :multi
+  "read group data from  streams")
+
+(defmethod tell ((cmd (eql 'XREADGROUP)) &rest args)
+  (ds-bind (group consumer keys &key count block noack) args
+    (let ((cmdstr (cl:append (list 'GROUP group consumer)
+		             (when count (list "COUNT" count))
+                             (when block (list "BLOCK" block))
+                             (when noack (list "NOACK"))
+	                     (list "STREAMS")
+	                     (apply #'cl:append (apply #'mapcar #'list keys)))))
+	  (format t "~a~&" cmdstr)
+	  (apply #'tell "XREADGROUP" cmdstr))))
+
+
+;; (def-cmd XGROUP (&rest args) :anything
+;;   "xgroup create setip destroy ...")
+
+(def-cmd XGROUP-CREATE (key group id) :status
+  "xgroup-create group")
+
+;; (defmethod tell ((cmd (eql 'XGROUP-CREATE)) &rest args)
+;;   (ds-bind (key group id) args
+;;     (funcall #'tell "XGROUP" "CREATE" key group id)))
+
+(def-cmd XGROUP-SETID (key group id) :status
+	 "xgroup-setid")
+
+(def-cmd XGROUP-DESTROY (key group) :integer
+	 "xgroup-desotry")
+
+(def-cmd XGROUP-DELCONSUMER (key group consumer) :integer
+	 "xgroup-delconsumer")
+
+(def-cmd XACK (key group fid &rest ids) :integer
+  "xack ack ids")
+
+;; (defmethod tell ((cmd (eql 'XACK)) &rest args)
+;;   (ds-bind (key group &rest ids) args
+;;     (let ((cmdstr (cl:append (list key group)
+;; 			     ids)))
+;;       (format t "~a~&" args)
+;;       (apply #'tell "XACK" cmdstr))))
+
+(def-cmd XPENDING (key group &rest args) :anything
+  "query pending for stream and group")
+
+(def-cmd XTRIM (key maxlen &rest args &key approximate) :integer
+	 "xtrim command")
+
+(defmethod tell ((cmd (eql 'XTRIM)) &rest args)
+  (ds-bind (key maxlen &key approximate) args
+    (apply #'tell "XTRIM"
+	   (cl:append (list key "MAXLEN")
+		      (when approximate (list "~"))
+		      (list maxlen)))))
 ;;; not supported commands: MONITOR, DEBUG OBJECT, DEBUG SEGFAULT - use redis-cli for that
 
 ;;; end
