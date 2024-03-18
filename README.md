@@ -101,6 +101,31 @@ To publish, obviously:
   (red:publish "foo" "test"))
 ```
 
+### Streams
+redis introduced stream in v5.0
+
+```lisp
+(with-connection ()
+  (red:xadd "streamname1" "*" "key1" "data1" "key2" "data2"))
+
+(with-connection ()
+  (red:xadd "streamname2" "*" "key1" "data1" "key2" "data2"))
+
+(with-connection ()
+  (red:xread '(("streamname1" 0) ("streamname2" 0))))
+
+(with-connection ()
+  (red:xgroup-create "streamname1" "group1" "$"))
+
+(with-connection ()
+  (red:xreadgroup "group1" "consumer1" '(("streamname1" ">"))))
+
+(with-connection ()
+  (red:xack "streamname1" "group1" id))
+
+```
+
+
 ### Pipelining
 
 For better performance Redis allows to pipeline commands
