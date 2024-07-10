@@ -76,6 +76,7 @@ CMD is the command name (a string or a symbol), and ARGS are its arguments
 (defmethod tell (cmd &rest args)
   (let ((all-args (cl:append (ppcre:split "-" (ensure-string cmd))
                              args)))
+    (format t "~a~&" all-args)
     (format-redis-number #\* (length all-args))
     (dolist (arg all-args)
       (let ((arg (ensure-string arg)))
