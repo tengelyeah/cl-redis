@@ -862,8 +862,7 @@ Note: before/after can only have 2 values: :before or :after.")
     (let ((cmdstr (cl:append (when count (list "COUNT" count))
                              (when block (list "BLOCK" block))
 	                     (list "STREAMS")
-	                     keys
-			     (list "$"))))
+	                     (apply #'cl:append (apply #'mapcar #'list keys)))))
 	  (format t "~a~&" cmdstr)
 	  (apply #'tell "XREAD" cmdstr))))
 
@@ -877,8 +876,8 @@ Note: before/after can only have 2 values: :before or :after.")
                              (when block (list "BLOCK" block))
                              (when noack (list "NOACK"))
 	                     (list "STREAMS")
-	                     keys
-			     (list ">"))))
+	                     (apply #'cl:append (apply #'mapcar #'list keys)))))
+
 	  (format t "~a~&" cmdstr)
 	  (apply #'tell "XREADGROUP" cmdstr))))
 
