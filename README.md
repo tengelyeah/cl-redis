@@ -174,6 +174,15 @@ but the results will only be available to the highest-level pipeline,
 all the nested pipelines will return :PIPELINED.
 So a warining is signalled in this situation.
 
+### Support octet key and value
+
+User can use list of octet(0<=v<=255) or vector for key and data.
+
+```lisp
+(redis:red-set '(212 213 214) '(224 223 222))
+
+(redis:red-get '(212 213 214))
+```
 
 ## Internals
 
