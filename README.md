@@ -246,6 +246,7 @@ developed the connection handling code following the implementation in
 partially rewritten to accommodate more advanced connection handling
 strategies, like persistent connection.
 
+New function was inroduced by <tengel.liu@gmail.com>.
 
 ## License
 
