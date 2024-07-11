@@ -26,6 +26,14 @@ If *ECHOP-P* is not NIL, write that string to *ECHO-STREAM*, too."
     (write-byte 13 soc)
     (write-byte 10 soc)))
 
+(defun format-redis-octets (bytes)
+  "Write a vector of byte and CRLF-terminator to the stream"
+  (let ((soc (flex:flexi-stream-stream (conn-stream *connection*))))
+    (when *echo-p* (format *echo-stream* "> ~a~%" bytes))
+    (write-sequence bytes soc)
+    (write-byte 13 soc)
+    (write-byte 10 soc)))
+
 (defun ensure-string (obj)
   (typecase obj
     (string obj)
@@ -73,14 +81,34 @@ CMD is the command name (a string or a symbol), and ARGS are its arguments
   (declare (ignore cmd args))
   (force-output (conn-stream *connection*)))
 
+(defun seq-of-octet-p (soo)
+  (print soo)
+  (and (typep soo 'sequence)
+       (reduce (lambda (prev cur)
+		 (print cur)
+		 (and prev (numberp cur) (< cur 256) (>= cur 0)))
+	       soo :initial-value t)))
+
+(deftype octet-seq ()
+  `(satisfies seq-of-octet-p))
+
 (defmethod tell (cmd &rest args)
   (let ((all-args (cl:append (ppcre:split "-" (ensure-string cmd))
                              args)))
     (format-redis-number #\* (length all-args))
     (dolist (arg all-args)
-      (let ((arg (ensure-string arg)))
-        (format-redis-number #\$ (babel:string-size-in-octets arg :encoding :UTF-8))
-        (format-redis-string arg)))))
+      (typecase arg
+	((vector flex:octet)
+	 (progn
+	   (format-redis-number #\$ (length arg))
+	   (format-redis-octets arg)))
+	(octet-seq
+	 (let ((octets (coerce arg '(vector flex:octet))))
+	   (format-redis-number #\$ (length octets))
+	   (format-redis-octets octets)))
+	(t (let ((arg (ensure-string arg)))
+             (format-redis-number #\$ (babel:string-size-in-octets arg :encoding :UTF-8))
+             (format-redis-string arg)))))))
 
 
 ;; Pipelining
@@ -189,6 +217,30 @@ server with the first character removed."
 (def-expect-method :integer
   (values (parse-integer reply)))
 
+
+(defun octets-to-string-fail-nil (bytes)
+  (handler-case
+      (babel:octets-to-string bytes :encoding :UTF-8)
+    (error(c)
+      nil)))
+
+;; (defmacro read-bulk-reply (&key post-processing (decode t))
+;;   (with-gensyms (n bytes in str)
+;;     `(let ((,n (parse-integer reply)))
+;;        (unless (< ,n 0)
+;;          (let ((,bytes (make-array ,n :element-type 'flex:octet))
+;;                (,in (conn-stream *connection*)))
+;;            (read-sequence ,bytes ,in)
+;;            (read-byte ,in)               ; #\Return
+;;            (read-byte ,in)               ; #\Linefeed
+;;            ,(if decode
+;;                 `(let ((,str (babel:octets-to-string ,bytes :encoding :UTF-8)))
+;;                    (when *echo-p* (format *echo-stream* "<  ~A~%" ,str))
+;;                    (unless (string= "nil" ,str)
+;;                      (if ,post-processing
+;;                          (funcall ,post-processing ,str)
+;;                          ,str)))
+;;                 bytes))))))
 (defmacro read-bulk-reply (&key post-processing (decode t))
   (with-gensyms (n bytes in str)
     `(let ((,n (parse-integer reply)))
@@ -199,12 +251,14 @@ server with the first character removed."
            (read-byte ,in)               ; #\Return
            (read-byte ,in)               ; #\Linefeed
            ,(if decode
-                `(let ((,str (babel:octets-to-string ,bytes :encoding :UTF-8)))
-                   (when *echo-p* (format *echo-stream* "<  ~A~%" ,str))
-                   (unless (string= "nil" ,str)
-                     (if ,post-processing
-                         (funcall ,post-processing ,str)
-                         ,str)))
+                `(let ((,str (octets-to-string-fail-nil ,bytes)))
+		   (if (null ,str)
+		       ,bytes
+                       (progn (when *echo-p* (format *echo-stream* "<  ~A~%" ,str))
+			      (unless (string= "nil" ,str)
+				(if ,post-processing
+				    (funcall ,post-processing ,str)
+                             ,str)))))
                 bytes))))))
 
 (def-expect-method :bulk
