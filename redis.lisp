@@ -82,10 +82,10 @@ CMD is the command name (a string or a symbol), and ARGS are its arguments
   (force-output (conn-stream *connection*)))
 
 (defun seq-of-octet-p (soo)
-  (print soo)
+  ;;(print soo)
   (and (typep soo 'sequence)
        (reduce (lambda (prev cur)
-		 (print cur)
+		 ;;(print cur)
 		 (and prev (numberp cur) (< cur 256) (>= cur 0)))
 	       soo :initial-value t)))
 
